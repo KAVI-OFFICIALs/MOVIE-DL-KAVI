@@ -1,0 +1,15 @@
+{
+  "name": "whatsapp-movie-downloader-bot",
+  "version": "1.0.0",
+  "description": "A WhatsApp bot for downloading movies",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.16.0",
+    "sinhalasub.lk": "^1.0.0",
+    "qrcode-terminal": "^0.12.0",
+    "fs": "^0.0.1"
+  }
+}
