@@ -7,8 +7,8 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "whatsapp-web.js": "^1.16.0",
-    "sinhalasub.lk": "^1.0.0",
+    "whatsapp-web.js": "^1.25.0",
+    "sinhalasub.lk": "^9.0.0",
     "qrcode-terminal": "^0.12.0",
     "fs": "^0.0.1"
   }
