@@ -1,13 +1,32 @@
-const { Client, Buttons, MessageMedia } = require('whatsapp-web.js');
-const { searchMovie, getMovieDetails, getDownloadLink } = require('./utils/movieDownloader');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
 const fs = require('fs');
+const { handleMovieCommand } = require('./commands/movieCommand');
 
-const client = new Client();
+const SESSION_FILE_PATH = './session.json'; // File path to store session data
+let sessionData;
 
-let selectedMovie = ''; // Store selected movie name
+if (fs.existsSync(SESSION_FILE_PATH)) {
+    sessionData = require(SESSION_FILE_PATH); // Load existing session data
+}
+
+const client = new Client({
+    authStrategy: new LocalAuth({
+        clientId: 'client-one', // Store session ID
+    }),
+});
 
 client.on('qr', (qr) => {
-    console.log('QR RECEIVED', qr);
+    qrcode.generate(qr, { small: true }); // Display QR code in terminal
+});
+
+client.on('authenticated', (session) => {
+    sessionData = session;
+    fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(session)); // Save session data to file
+});
+
+client.on('auth_failure', () => {
+    console.error('Authentication failed, please try again.');
 });
 
 client.on('ready', () => {
@@ -16,79 +35,22 @@ client.on('ready', () => {
 
 client.on('message', async (msg) => {
     if (msg.body.startsWith('.movie')) {
-        const movieName = msg.body.split(' ').slice(1).join(' ');
+        // React with emoji for starting
+        await msg.react('🔄');
+        await handleMovieCommand(client, msg); // Handle movie command
+    }
+});
 
-        try {
-            const movies = await searchMovie(movieName);
-
-            if (movies.length > 0) {
-                let buttons = [];
-                movies.forEach((movie, index) => {
-                    buttons.push({ body: movie.title });
-                });
-
-                let buttonMsg = new Buttons(
-                    'Select the movie you want to download:', 
-                    buttons, 
-                    'Movie Selection', 
-                    'Please choose:'
-                );
-                client.sendMessage(msg.from, buttonMsg);
-            } else {
-                msg.reply('No movies found with that name.');
-            }
-        } catch (error) {
-            msg.reply('An error occurred while searching for movies.');
-        }
-    } else if (msg.type === 'buttons_response') {
-        if (selectedMovie === '') {
-            selectedMovie = msg.body;  // Store selected movie by user
-
-            try {
-                const movieDetails = await getMovieDetails(selectedMovie);
-
-                let movieInfo = `*Title:* ${movieDetails.title}\n*Description:* ${movieDetails.description}\n*Category:* ${movieDetails.category}\n*Available Qualities:* ${movieDetails.qualities.join(', ')}`;
-                let media = MessageMedia.fromUrl(movieDetails.image);  // Movie image
-
-                await client.sendMessage(msg.from, media, { caption: movieInfo });
-
-                let qualityButtons = movieDetails.qualities.map((quality) => ({ body: quality }));
-                let qualityMsg = new Buttons(
-                    'Select the movie quality you want:', 
-                    qualityButtons, 
-                    'Quality Selection', 
-                    'Please choose:'
-                );
-                client.sendMessage(msg.from, qualityMsg);
-
-            } catch (error) {
-                msg.reply('Error fetching movie details.');
-            }
-        } else {
-            const selectedQuality = msg.body;
-
-            try {
-                let movieLink = await getDownloadLink(selectedMovie, selectedQuality);
-
-                let loadingMsg = await client.sendMessage(msg.from, 'Downloading movie, please wait...');
-
-                // Simulating download progress (replace with actual progress)
-                let progress = 0;
-                let interval = setInterval(async () => {
-                    progress += 10;
-                    await client.editMessage(loadingMsg, `Downloading... ${progress}%`);
-
-                    if (progress >= 100) {
-                        clearInterval(interval);
-                        let movieMedia = MessageMedia.fromFilePath('/path/to/downloaded/movie.mp4');  // Actual movie path
-                        await client.sendMessage(msg.from, movieMedia, { caption: 'Here is your movie!' });
-                    }
-                }, 1000);
-
-            } catch (error) {
-                msg.reply('Error occurred while downloading the movie.');
-            }
-        }
+client.on('message_create', async (msg) => {
+    // Emojis based on the stages of downloading
+    if (msg.body.includes('Starting')) {
+        await msg.react('🚀');
+    } else if (msg.body.includes('Downloading')) {
+        await msg.react('📥');
+    } else if (msg.body.includes('Uploading')) {
+        await msg.react('📤');
+    } else if (msg.body.includes('Success')) {
+        await msg.react('✅');
     }
 });
 
